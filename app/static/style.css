@@ -1,0 +1,9 @@
+/* change the background color */
+.navbar-nav {
+    background-color: #95aef4;
+}
+
+/* change the brand and text color */
+.navbar-nav .navbar-text {
+    color: #06093a;
+}

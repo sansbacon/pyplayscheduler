@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block navbar %}
+{{nav.top.render()}}
+{% endblock %}
+
+{% block content %}
+{{util.flashed_messages(dismissible=True)}}
+<div class="container">
+  <h1>{% block title %} Schedule Summary {% endblock %}</h1>
+  <hr>
+  <p>Here are the players</p>
+    {% for player in data.players %}
+        <h2> {{ player }} </h2>
+    <hr>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block head %}
+{{super()}}
+{{fixes.ie8()}}
+{% endblock %}
