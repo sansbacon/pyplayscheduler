@@ -17,9 +17,10 @@ class Scheduler:
 
     """
     def __init__(self, 
-                 player_names: List[str], 
                  n_rounds: int, 
                  n_courts: int, 
+                 n_players: int = None,
+                 player_names: List[str] = None, 
                  players_per_court: int = 4, 
                  iterations: int = 500):
         """Instantiate Scheduler object
@@ -36,7 +37,18 @@ class Scheduler:
 
         """
         logging.getLogger(__name__).addHandler(logging.NullHandler)
-        self.player_names = player_names if isinstance(player_names, np.ndarray) else np.array(player_names)
+
+        # need player names or number of players
+        if player_names is not None:
+            if type(player_names) not in [list, np.ndarray]:
+                raise ValueError(f'Invalid value (must be list or array) for player_names: {player_names}')
+            self.player_names = player_names if isinstance(player_names, np.ndarray) else np.array(player_names)
+            self._n_players = self.player_names.shape[0]
+        elif n_players is not None:
+            self.player_names = []
+            self._n_players = n_players
+        else:
+            raise ValueError('Must specify player names or number of players')
         self.n_courts = n_courts
         self.n_rounds = n_rounds
         self.players_per_court = players_per_court
@@ -44,6 +56,8 @@ class Scheduler:
 
     @property
     def n_players(self):
+        if self._n_players:
+            return self._n_players
         return self.player_names.shape[0]
 
     def create_schedules(self, 

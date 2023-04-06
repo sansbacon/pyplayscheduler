@@ -3,13 +3,11 @@
 # Copyright (C) 2023 Eric Truett
 
 from pathlib import Path
+import random
 import sys
 
 import numpy as np
 import pytest
-
-
-sys.path.append("../pyscheduler")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -81,5 +79,5 @@ def sample_schedule():
             [ 3, 11,  6,  5, 12,  1,  2,  0, 10,  8,  7,  9]]])
 
 @pytest.fixture()
-def sample_dups():
+def sample_dupcounts():
     return np.array([7, 5, 1, 5, 3])
