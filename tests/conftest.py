@@ -81,3 +81,20 @@ def sample_schedule():
 @pytest.fixture()
 def sample_dupcounts():
     return np.array([7, 5, 1, 5, 3])
+
+
+@pytest.fixture()
+def sample_dupcounts_weighted():
+    return np.array([7, 5, 1, 5, 3])
+
+
+@pytest.fixture()
+def sample_dupcounts_opp():
+    return np.array([19, 12, 12, 14, 15])
+
+
+@pytest.fixture()
+def sample_dupcounts_opp_weighted():
+    return np.array([19, 12, 12, 14, 15])
+
+

@@ -10,7 +10,7 @@ from pyscheduler import Scheduler
 
 @pytest.fixture
 def s() -> Scheduler:
-    params = {'n_players': 13, 'n_rounds': 10, 'n_courts': 3, 'iterations': 50}
+    params = {'n_players': 13, 'n_rounds': 5, 'n_courts': 3, 'iterations': 50}
     return Scheduler(**params)
     
 
@@ -67,6 +67,7 @@ def test_create_schedules(s: Scheduler):
 def test_calculate_byes(player_names):
     """Tests correct shape of calculate_byes"""
     n_players = random.choice(range(13, 16))
+    iterations = 50
     params = {'player_names': random.sample(player_names, n_players), 'n_rounds': 10, 'n_courts': 3, 'iterations': iterations}
     s = Scheduler(**params)
     byes = s.calculate_byes()
@@ -85,90 +86,68 @@ def test_cartesian():
     assert c == c2, f'Combinations do not match: {c} {c2}'
 
 
-def test_counter_dups(sample_schedule, sample_dupcounts, tprint):
+def test_counter_dups_partner(sample_schedule, sample_dupcounts):
     params = {'n_players': 13, 'n_rounds': 5, 'n_courts': 3, 'iterations': 5}
     s = Scheduler(**params)
     cdupes = np.array([s.counter_dups(sched, 'partner') for sched in sample_schedule])
     assert np.array_equal(sample_dupcounts, cdupes), 'Arrays should be equal'
 
 
-    """
+def test_counter_dups_opponent(sample_schedule: np.ndarray, sample_dupcounts_opp: np.ndarray):
+    """Tests counter_dups with opponent parameter"""
+    params = {'n_players': 13, 'n_rounds': 5, 'n_courts': 3, 'iterations': 5}
+    s = Scheduler(**params)
+    dupcounts = []
     
-    
-    def counter_dups(self, sched: np.ndarray, dup_type: str, return_data: bool = False) -> int:
-        
-        Args:
-            sched(np.ndarray): the schedule to count the duplicates
-            dup_type(str): the dupes to count (opponent or partner)
-            return_data(bool): whether to return underlying data, default False
+    for sched in sample_schedule:
+        ppc = s.players_per_court
+        opponents = np.array([s.cartesian(i) for i in 
+                              sched.reshape(sched.shape[0] * sched.shape[1] // ppc, ppc // 2, ppc // 2)])
+        opponents = np.sort(opponents.reshape(s.n_rounds * s.n_courts * ppc, 2), axis=-1)
+        dupcounts.append(s.counter_dups(opponents, 'opponent'))
+    assert np.array_equal(sample_dupcounts_opp, np.array(dupcounts)), 'Arrays should be equal'
 
-        Returns:
-            int
 
-    
-    def dupcount(self, sched: np.ndarray, return_data: bool = False) -> int:
-    
-        Args:
-            sched(np.ndarray): the schedule to count the duplicates
-            return_data(bool): whether to return underlying data, default False
+def test_dupcount(s: Scheduler, sample_schedule: np.ndarray, sample_dupcounts: np.ndarray):
+    """Tests dupcount method"""
+    dups = np.array([s.dupcount(sched) for sched in sample_schedule])
+    assert np.array_equal(dups, sample_dupcounts)
 
-        Returns:
-            np.ndarray
 
-    
-            
-    def dupcount_weighted(self, sched: np.ndarray, weights: np.ndarray = None) -> int:
-        
-        Args:
-            sched(np.ndarray): the schedule to count the duplicates
-            weights(np.ndarray): the weights to apply to duplicate counts
+def test_oppdupcount(s: Scheduler, sample_schedule: np.ndarray, sample_dupcounts_opp: np.ndarray, tprint):
+    """Tests oppdupcount method"""
+    dups = np.array([s.oppdupcount(sched) for sched in sample_schedule])
+    assert np.array_equal(dups, sample_dupcounts_opp)
 
-        Returns:
-            int
 
-        
-    def oppdupcount(self, sched: np.ndarray, return_data: bool = False) -> int:
-        
-        Args:
-            sched(np.ndarray): the schedule to count the duplicates
-            return_data(bool): whether to return underlying data, default False
+def test_dupcount_weighted(s:Scheduler, sample_schedule: np.ndarray, sample_dupcounts_weighted: np.ndarray):
+    """Tests weighted dupcounts"""
+    # def dupcount_weighted(self, sched: np.ndarray, weights: np.ndarray = None) -> int:
+    pass
 
-        Returns:
-            np.ndarray
 
-    
-    def oppdupcount_weighted(self, sched: np.ndarray, weights: np.ndarray = None) -> int:
-        
-        Args:
-            sched(np.ndarray): the schedule to count the duplicates
-            weights(np.ndarray): the weights to apply to duplicate counts
+def test_oppdupcount_weighted(s:Scheduler, sample_schedule: np.ndarray, sample_dupcounts_opp_weighted: np.ndarray):
+    """Tests weighted dupcounts"""
+    # def dupcount_weighted(self, sched: np.ndarray, weights: np.ndarray = None) -> int:
+    pass
 
-        Returns:
-            int
 
-    
-    def optimize_schedule(
-            self,
-            n_players: int, 
-            n_rounds: int, 
-            n_courts: int, 
-            iterations: int = 10000, 
-            players_per_court: int = 4,
-            scoring_function: str = 'naive') -> np.ndarray:
-        
-        Args:
-            n_players(int): total number of players in pool
-            n_rounds(int): number of rounds of play
-            n_courts(int): number of courts to use
-            iterations(int): number of iterations to optimize on, default 10000
-            players_per_court(int): default 4
-            scoring_function(str): specifies how to score optimality of schedule, default 'naive'
+def test_optimize_schedule(s: Scheduler, tprint):
+    expected_shape = (s.n_rounds, s.n_courts, s.players_per_court)
+    sched = s.optimize_schedule()
+    assert sched.shape == expected_shape
 
-        Returns:
-            np.ndarray
-       
 
-    @staticmethod
-    def shuffle_along(X):
-        [np.random.shuffle(x) for x in X]
-"""
+def test_shuffle_along(s: Scheduler, tprint):
+    """Tests shuffle along method"""
+    failures = 0
+    for i in range(1000):
+        n = 12
+        a = np.arange(0, n).reshape(n // 4, 4)
+        b = np.arange(0, n).reshape(n // 4, 4)
+        assert np.array_equal(a, b)
+        s.shuffle_along(a)
+        if np.array_equal(a, b):
+            failures += 1
+    tprint(failures)
+    assert failures < 2
