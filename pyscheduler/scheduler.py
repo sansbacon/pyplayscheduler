@@ -370,7 +370,7 @@ class Scheduler:
             oppdupcounts = np.array([self.oppdupcount(s) for s in candidates])
             optimal = candidates[oppdupcounts.argmin()].reshape(n_rounds, n_courts, players_per_court)
 
-        return Schedule(schedule=optimal, partner_dupcount=dupcounts, opponent_dupcount=oppdupcounts)
+        return Schedule(schedule=optimal, partner_dupcount=dupcounts.min(), opponent_dupcount=oppdupcounts.min())
 
     @staticmethod
     def shuffle_along(X):
