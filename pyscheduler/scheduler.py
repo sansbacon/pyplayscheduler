@@ -118,7 +118,6 @@ class Scheduler:
         n_rounds = n_rounds if n_rounds else self.n_rounds
         players_per_court = players_per_court if players_per_court else self.players_per_court
 
-
         # determine the number of needed byes
         # in large field, could need more than 1 bye per player
         # so create large list of byes and cut it down accordingly
@@ -232,10 +231,13 @@ class Scheduler:
         # step 1: have to convert schedule into pairs of player-opponent
         # the total number should be n_rounds * n_courts * players_per_court
         opponents = np.array([self.cartesian(i) for i in 
-                              sched.reshape(sched.shape[0] * sched.shape[1] // ppc, ppc // 2, ppc // 2)])
+                              sched.reshape((sched.shape[0] * sched.shape[1]) // ppc, ppc // 2, ppc // 2)])
 
         # step 2: need to reshape and sort the 2-element arrays because we are going to count tuples
-        opponents = np.sort(opponents.reshape(self.n_rounds * self.n_courts * ppc, 2), axis=-1)
+        expected_shape = self.n_rounds * self.n_courts, ppc, ppc // 2
+        assert opponents.shape == expected_shape, f'Expected {expected_shape}, got {opponents.shape}'
+        opponents = opponents.reshape(self.n_rounds * self.n_courts * ppc, ppc // 2)
+        opponents = np.sort(opponents, axis=-1)
 
         # step 3: return the dupcount and optional data 
         dupcount = opponents.shape[0] - np.unique(opponents, axis=0).shape[0]   
@@ -276,11 +278,11 @@ class Scheduler:
     
     def optimize_schedule(
             self,
-            n_players: int, 
-            n_rounds: int, 
-            n_courts: int, 
-            iterations: int = 10000, 
-            players_per_court: int = 4,
+            n_players: int = None, 
+            n_rounds: int = None, 
+            n_courts: int = None, 
+            iterations: int = None, 
+            players_per_court: int = None,
             scoring_function: str = 'naive') -> np.ndarray:
         """Optimizes schedule for given parameters
         
@@ -296,10 +298,16 @@ class Scheduler:
             np.ndarray
 
         """    
+        # process function arguments
+        iterations = iterations if iterations else self.iterations
+        n_players = n_players if n_players else self.n_players
+        n_courts = n_courts if n_courts else self.n_courts
+        n_rounds = n_rounds if n_rounds else self.n_rounds
+        players_per_court = players_per_court if players_per_court else self.players_per_court
+
         # get initial schedule - setdiff1d will remove shuffle so do shuffle later
         # sched is shape (n_rounds, n_players)
         scheds = self.create_schedules(n_players, n_rounds, n_courts, iterations, players_per_court)
-
 
         # for naive scoring function, we first minimize the count of duplicates
         # from the 1+ schedules with the same duplicate count, we then minimize opponent duplicates
