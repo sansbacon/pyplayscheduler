@@ -64,13 +64,14 @@ def test_create_schedules(s: Scheduler):
     assert scheds.shape == (s.iterations, s.n_rounds, s.n_courts * s.players_per_court)    
 
 
-def test_calculate_byes(player_names):
+def test_calculate_byes(player_names, tprint):
     """Tests correct shape of calculate_byes"""
     n_players = random.choice(range(13, 16))
     iterations = 50
-    params = {'player_names': random.sample(player_names, n_players), 'n_rounds': 10, 'n_courts': 3, 'iterations': iterations}
+    params = {'n_players': n_players, 'n_rounds': 12, 'n_courts': 3, 'iterations': iterations}
     s = Scheduler(**params)
     byes = s.calculate_byes()
+    tprint(byes)
     assert byes.shape == (s.n_rounds, n_players - (s.n_courts * s.players_per_court))    
     assert set(byes.flatten()) == set(range(n_players))
 
@@ -132,13 +133,13 @@ def test_oppdupcount_weighted(s:Scheduler, sample_schedule: np.ndarray, sample_d
     pass
 
 
-def test_optimize_schedule(s: Scheduler, tprint):
+def test_optimize_schedule(s: Scheduler):
     expected_shape = (s.n_rounds, s.n_courts, s.players_per_court)
     sched = s.optimize_schedule()
-    assert sched.shape == expected_shape
+    assert sched.schedule.shape == expected_shape
 
 
-def test_shuffle_along(s: Scheduler, tprint):
+def test_shuffle_along(s: Scheduler):
     """Tests shuffle along method"""
     failures = 0
     for i in range(1000):
@@ -149,5 +150,4 @@ def test_shuffle_along(s: Scheduler, tprint):
         s.shuffle_along(a)
         if np.array_equal(a, b):
             failures += 1
-    tprint(failures)
     assert failures < 2

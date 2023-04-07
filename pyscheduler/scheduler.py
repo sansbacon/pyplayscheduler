@@ -1,10 +1,51 @@
 # pyscheduler/scheduler.py
 
 from collections import Counter
+from dataclasses import dataclass
 import logging
 from typing import List
 
 import numpy as np
+
+
+@dataclass
+class Schedule:
+    """Class for encapsulating a single schedule
+    
+    n_players: int = None
+    players_per_court: int = 4
+    schedule: np.ndarray = None
+    partner_dupcount: float = None
+    opponent_dupcount: float = None
+    player_names: List[str] = None
+    
+    """
+    n_players: int = None
+    players_per_court: int = 4
+    schedule: np.ndarray = None
+    partner_dupcount: float = None
+    opponent_dupcount: float = None
+    player_names: List[str] = None
+    
+    @property
+    def n_rounds(self):
+        return self.schedule.shape[0]
+
+    @property
+    def n_courts(self):
+        return self.schedule.shape[1] // self.players_per_court
+
+    @property
+    def player_count(self):
+        return np.unique(self.schedule.flatten()).shape[0]
+
+    def to_dict(self):
+        """Converts object to three-keyed dict: schedule, partner_dupcount, opponent_dupcount"""
+        return {
+            'schedule': self.schedule,
+            'partner_dupcount': self.partner_dupcount,
+            'opponent_dupcount': self.opponent_dupcount            
+        }
 
 
 class Scheduler:
@@ -53,6 +94,7 @@ class Scheduler:
         self.n_rounds = n_rounds
         self.players_per_court = players_per_court
         self.iterations = iterations
+        self.optimal_schedule = None
 
     @property
     def n_players(self):
@@ -283,7 +325,7 @@ class Scheduler:
             n_courts: int = None, 
             iterations: int = None, 
             players_per_court: int = None,
-            scoring_function: str = 'naive') -> np.ndarray:
+            scoring_function: str = 'naive') -> Schedule:
         """Optimizes schedule for given parameters
         
         Args:
@@ -295,7 +337,7 @@ class Scheduler:
             scoring_function(str): specifies how to score optimality of schedule, default 'naive'
 
         Returns:
-            np.ndarray
+            Schedule
 
         """    
         # process function arguments
@@ -316,14 +358,19 @@ class Scheduler:
             sched_idx = dupcounts == dupcounts.min()
             candidates = scheds[sched_idx]
             oppdupcounts = np.array([self.oppdupcount(s) for s in candidates])
-            return candidates[oppdupcounts.argmin()].reshape(n_rounds, n_courts, players_per_court)
+            optimal = candidates[oppdupcounts.argmin()].reshape(n_rounds, n_courts, players_per_court)
 
         # for weighted scoring function, we put a penalty on higher duplicate numbers (3+)
         # we also try to balance partner and opponent duplicates more
         if scoring_function == 'weighted':
             dupcounts = np.array([self.dupcount_weighted(sched) for sched in scheds])
             oppdupcounts = np.array([self.dupcount_weighted(sched) for sched in scheds])
-            
+            sched_idx = dupcounts == dupcounts.min()
+            candidates = scheds[sched_idx]
+            oppdupcounts = np.array([self.oppdupcount(s) for s in candidates])
+            optimal = candidates[oppdupcounts.argmin()].reshape(n_rounds, n_courts, players_per_court)
+
+        return Schedule(schedule=optimal, partner_dupcount=dupcounts, opponent_dupcount=oppdupcounts)
 
     @staticmethod
     def shuffle_along(X):
