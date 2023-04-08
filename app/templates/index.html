@@ -5,5 +5,16 @@
 <div class="container-fluid">
   <h1>Schedule Setup</h1>
   {{ wtf.quick_form(form, form_type='horizontal', button_map={'submit_button': 'primary'})}}
+
+  {% if form.errors %}
+  <ul class="errors">
+      {% for field_name, field_errors in form.errors|dictsort if field_errors %}
+          {% for error in field_errors %}
+              <li>{{ form[field_name].label }}: {{ error }}</li>
+          {% endfor %}
+      {% endfor %}
+  </ul>
+{% endif %}
+
 </div>
 {% endblock %}
