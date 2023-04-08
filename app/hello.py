@@ -1,11 +1,13 @@
 import datetime
+import json
 import os
 
-from flask import Flask, render_template, redirect, url_for, session, jsonify, request
+from flask import Flask, render_template, session, redirect, url_for, jsonify, current_app
 from flask_bootstrap import Bootstrap
 from flask_wtf import FlaskForm
 from wtforms import TimeField, TextAreaField, SubmitField, SelectField
 from wtforms.validators import DataRequired, ValidationError
+
 
 from config import config
 from nav import nav
@@ -30,6 +32,24 @@ class SettingsForm(FlaskForm):
     submit = SubmitField('Create Schedule')
 
 
+def readable_schedule(players: list, sched: str, sep=' - '):
+    """Creates readable schedule"""
+    # data has players and schedule keys
+    if not sched:
+        return [1, 1, 'No available schedule', 'No available schedule']
+    items = []
+    if isinstance(sched, str):
+        sched = json.loads(sched)
+    for idx, rnd in enumerate(sched):
+        court = 1
+        for matchup in rnd:
+            team1 = sep.join([players[int(i)].strip() for i in matchup[0:2]])
+            team2 = sep.join([players[int(i)].strip() for i in matchup[2:]])            
+            items.append([idx + 1, court, team1, team2])
+            court += 1
+    return items
+
+
 def create_app(app_environment=None):
     if app_environment is None:
         app = Flask(__name__)
@@ -38,9 +58,11 @@ def create_app(app_environment=None):
         app = Flask(__name__)
         app.config.from_object(config[app_environment])
     app.secret_key = 'xyzabc'
+    filename = os.path.join(app.static_folder, 'schedule.json')
+    with open(filename) as test_file:
+        app.schedule = {(item['n_courts'], item['n_rounds'], item['n_players']): item['schedule'] for item in json.load(test_file)}
     Bootstrap(app)
     nav.init_app(app)
-
 
     @app.route('/', methods=('GET', 'POST'))
     def setup():
@@ -56,8 +78,12 @@ def create_app(app_environment=None):
 
     @app.route('/schedule', methods=('GET',))
     def schedule():
-        return render_template('schedule.html', data=session['form_data'])
-    
+        f = session['form_data']
+        sched = current_app.schedule.get((int(f['courts']), int(f['rounds']), len(f['players'])))
+        rs = readable_schedule(f['players'], sched)
+        data = {**f, **{'schedule': rs}}
+        return render_template('schedule.html', data=data)
+
     @app.route('/summary', methods=('GET',))
     def summary():
         return render_template('summary.html', data=session['form_data'])
