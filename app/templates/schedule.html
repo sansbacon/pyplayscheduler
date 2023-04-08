@@ -26,9 +26,11 @@
     <tbody>
     {% for rnd in data.schedule %}
       <tr scope="row">
-      {% for field in rnd %}
-        <td>{{ field }}</td>      
-      {% endfor %}
+      {% if rnd is iterable %}  
+        {% for field in rnd %}
+          <td>{{ field }}</td>      
+        {% endfor %}
+      {% endif %}  
       </tr>      
     {% endfor %}
     </tbody>

@@ -3,7 +3,7 @@ import json
 import os
 import re
 
-from flask import Flask, render_template, session, redirect, url_for, jsonify, current_app
+from flask import Flask, render_template, session, redirect, url_for, request, current_app
 from flask_bootstrap import Bootstrap
 from flask_wtf import FlaskForm
 from wtforms import TimeField, TextAreaField, SubmitField, SelectField
@@ -36,14 +36,17 @@ class SettingsForm(FlaskForm):
 
     def validate_players(form, field):
         names = [s for s in re.split('\s+', field.data) if s]
-        if len(names) < int(form.courts.data) * 4:
-            raise ValidationError('Must have enough players to fill the courts')
+        courts = int(form.courts.data)
+        min_players = courts * 4
+        if len(names) < min_players:
+            msg = f'ERROR: You only have {len(names)} players and need a minimum of {min_players} to fill {courts} courts. Increase the number of players or reduce the number of courts.'
+            raise ValidationError(msg)
 
 def readable_schedule(players: list, sched: str, sep=' - '):
     """Creates readable schedule"""
     # data has players and schedule keys
     if not sched:
-        return [1, 1, 'No available schedule', 'No available schedule']
+        return [[1, 1, 'No available schedule', 'Please try again']]
     items = []
     if isinstance(sched, str):
         sched = json.loads(sched)
@@ -69,6 +72,13 @@ nav.init_app(app)
 @app.route('/', methods=('GET', 'POST'))
 def setup():
     form = SettingsForm(meta={'csrf': False})
+    if all((request.method == 'GET', 'form_data' in session)):
+        if players := session['form_data'].get('players'):
+            form.players.data = '\n'.join(players)
+        if n_courts := session['form_data'].get('n_courts'):
+            form.courts.data = n_courts
+        if n_rounds := session['form_data'].get('n_rounds'):
+            form.rounds.data = n_rounds
     if form.validate_on_submit():
         session['form_data'] = {
             'players': [str(i) for i in form.players.data.split('\n')], 
@@ -80,9 +90,12 @@ def setup():
 
 @app.route('/schedule', methods=('GET',))
 def schedule():
-    f = session['form_data']
-    sched = current_app.schedule.get((int(f['courts']), int(f['rounds']), len(f['players'])))
-    rs = readable_schedule(f['players'], sched)
+    try:
+        f = session['form_data']
+        sched = current_app.schedule.get((int(f['courts']), int(f['rounds']), len(f['players'])))
+        rs = readable_schedule(f['players'], sched)
+    except:
+        rs = [[1, 1, 'No available schedule', 'Please try again']]
     data = {**f, **{'schedule': rs}}
     return render_template('schedule.html', data=data)
 
