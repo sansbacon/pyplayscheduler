@@ -1,10 +1,15 @@
+
+import re
+
 from flask import Blueprint, current_app, jsonify, redirect, render_template, request, session, url_for
+from google.appengine.api.memcache import Client
 
 from forms import SettingsForm
-from helper import create_optimal, readable_schedule, schedule_summary
+from helper import create_optimal, readable_schedule, schedule_summary, ts
 
 
 blueprint = Blueprint('blueprint', __name__, static_folder='static', template_folder='templates')
+mc = Client()
 
 
 @blueprint.route('/', methods=('GET', 'POST'))
@@ -18,8 +23,9 @@ def index():
         if n_rounds := session['form_data'].get('n_rounds'):
             form.rounds.data = n_rounds
     if form.validate_on_submit():
+        mc.add('ts', ts())
         session['form_data'] = {
-            'players': [str(i).strip() for i in form.players.data.split('\n')], 
+            'players': [str(i).strip() for i in re.split(r'[\n\r]+', form.players.data) if re.search(r'\w+', i)], 
             'rounds': form.rounds.data, 
             'courts': form.courts.data
         }
@@ -30,7 +36,6 @@ def index():
 @blueprint.route('/schedule', methods=('GET',))
 def schedule():
     if f := session['form_data']:
-        print(f)
         sched = current_app.schedule.get((int(f['courts']), int(f['rounds']), len(f['players'])))
         if sched:
             rs = readable_schedule(f['players'], sched)
@@ -41,10 +46,8 @@ def schedule():
               'n_players': len(f['players']),
               'iterations': 25000
             }
-            sched = create_optimal(**params)
-            rs = readable_schedule(f['players'], sched)
+            rs = readable_schedule(f['players'], create_optimal(**params))
     else:
-        print(session)
         rs = [[1, 1, 'No available schedule', 'Please try again']]
     data = {**f, **{'schedule': rs}}
     return render_template('schedule.html', data=data)

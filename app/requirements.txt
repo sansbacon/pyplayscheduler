@@ -7,4 +7,4 @@ flask-nav
 pyplayscheduler
 numpy
 pandas
-requests
+appengine-python-standard>=1.0.0
