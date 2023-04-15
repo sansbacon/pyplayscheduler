@@ -16,22 +16,24 @@ def number_to_word(n: Any) -> str:
                 '13': "Thirteen", '14': "Fourteen", '15': "Fifteen", '20': "Twenty", '25': "Twenty-Five", '30': 'Thirty'}.get(str(n))
 
 
-def readable_schedule(players: list, sched: str, sep=' - '):
+def readable_schedule(players: list, sched: str, sep=' - ') -> List[List]:
     """Creates readable schedule"""
     # data has players and schedule keys
     if not sched:
-        return [1, 1, 'No available schedule', 'No available schedule']
+        return [[1, 1, 'No available schedule', 'No available schedule']]
     items = []
     if isinstance(sched, str):
         sched = json.loads(sched)
-    for idx, rnd in enumerate(sched):
-        court = 1
-        for matchup in rnd:
-            team1 = sep.join([players[int(i)].strip() for i in matchup[0:2]])
-            team2 = sep.join([players[int(i)].strip() for i in matchup[2:]])            
-            items.append([idx + 1, court, team1, team2])
-            court += 1
-    return items
+    if isinstance(sched, list):
+        for idx, rnd in enumerate(sched):
+            court = 1
+            for matchup in rnd:
+                team1 = sep.join([players[int(i)].strip() for i in matchup[0:2]])
+                team2 = sep.join([players[int(i)].strip() for i in matchup[2:]])            
+                items.append([idx + 1, court, team1, team2])
+                court += 1
+        return items
+    raise ValueError('Invalid schedule format')
 
 
 def schedule_summary(players: List[str], sched: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
