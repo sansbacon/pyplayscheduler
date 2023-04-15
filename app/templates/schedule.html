@@ -6,17 +6,12 @@
   <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
 {% endblock %}
 
-{% block navbar %}
-{{nav.top.render()}}
-{% endblock %}
-
 {% block content %}
 {{util.flashed_messages(dismissible=True)}}
 <div class="container">
   <h1>{% block title %} Schedule for {{ data.rounds }} Rounds on {{ data.courts }} Courts {% endblock %}</h1>
   <hr>
-
-  <table id="example" class="table table-striped table-sm">
+  <table id="schedule" class="table table-striped table-sm">
     <thead class="thead-light">
       <th scope="col">Round</th>
       <th scope="col">Court</th>
@@ -46,7 +41,7 @@
 <script type="text/javascript" class="init">	
 
 document.addEventListener('DOMContentLoaded', function () {
-    let table = new DataTable('#example', {searching: false, info: false, "lengthChange": false, "pageLength": {{ data.courts }}});
+    let table = new DataTable('#schedule', {searching: false, info: false, "lengthChange": false, "pageLength": {{ data.courts }}});
 })
 
 </script>
