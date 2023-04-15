@@ -18,7 +18,7 @@ def index():
             form.rounds.data = n_rounds
     if form.validate_on_submit():
         session['form_data'] = {
-            'players': [str(i) for i in form.players.data.split('\n')], 
+            'players': [str(i).strip() for i in form.players.data.split('\n')], 
             'rounds': form.rounds.data, 
             'courts': form.courts.data
         }
@@ -41,14 +41,16 @@ def schedule():
 
 @blueprint.route('/summary', methods=('GET',))
 def summary():
-    f = session['form_data']
-    players = f['players']
-    schedule = f.get('schedule', current_app.schedule.get((int(f['courts']), int(f['rounds']), len(players))))
-    partners, opponents = schedule_summary(players, schedule)
-    data = {'summary': []}
+    try:
+        f = session['form_data']
+        players = f['players']
+        schedule = f.get('schedule', current_app.schedule.get((int(f['courts']), int(f['rounds']), len(players))))
+        partners, opponents = schedule_summary(players, schedule)
+        data = {'summary': []}
 
-    for (k, v), (k2, v2) in zip(partners.items(), opponents.items()):
-        data['summary'].append([k, v, v2])       
-
+        for (k, v), (k2, v2) in zip(partners.items(), opponents.items()):
+            data['summary'].append([k, v, v2])       
+    except:
+        data = {'summary': [[1, 'No available schedule', 'Please try again']]}
     return render_template('summary.html', data=data)
 
