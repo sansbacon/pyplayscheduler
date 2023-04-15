@@ -1,0 +1,6 @@
+gunicorn
+flask 
+flask-bootstrap
+flask-wtf
+wtforms
+flask-nav
