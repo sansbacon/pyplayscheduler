@@ -4,3 +4,7 @@ flask-bootstrap
 flask-wtf
 wtforms
 flask-nav
+pyplayscheduler
+numpy
+pandas
+requests

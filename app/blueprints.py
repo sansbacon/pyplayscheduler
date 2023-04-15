@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, session, redirect, request, url_for, current_app
+from flask import Blueprint, current_app, jsonify, redirect, render_template, request, session, url_for
+
 from forms import SettingsForm
-from helper import readable_schedule, schedule_summary
+from helper import create_optimal, readable_schedule, schedule_summary
 
 
-blueprint = Blueprint('blueprint', __name__, static_folder='static')
+blueprint = Blueprint('blueprint', __name__, static_folder='static', template_folder='templates')
 
 
 @blueprint.route('/', methods=('GET', 'POST'))
@@ -28,14 +29,24 @@ def index():
 
 @blueprint.route('/schedule', methods=('GET',))
 def schedule():
-    try:
-        f = session['form_data']
+    if f := session['form_data']:
+        print(f)
         sched = current_app.schedule.get((int(f['courts']), int(f['rounds']), len(f['players'])))
-        rs = readable_schedule(f['players'], sched)
-    except:
+        if sched:
+            rs = readable_schedule(f['players'], sched)
+        else:
+            params = {
+              'n_rounds': int(f['rounds']),
+              'n_courts': int(f['courts']), 
+              'n_players': len(f['players']),
+              'iterations': 25000
+            }
+            sched = create_optimal(**params)
+            rs = readable_schedule(f['players'], sched)
+    else:
+        print(session)
         rs = [[1, 1, 'No available schedule', 'Please try again']]
     data = {**f, **{'schedule': rs}}
-    print(data)
     return render_template('schedule.html', data=data)
 
 
@@ -54,3 +65,16 @@ def summary():
         data = {'summary': [[1, 'No available schedule', 'Please try again']]}
     return render_template('summary.html', data=data)
 
+
+@blueprint.route('/newschedule', methods=('POST',))
+def newschedule():
+    """Generates new schedule if optimal not already found"""
+    content = request.json
+    params = {
+        'n_rounds': content['n_rounds'],
+        'n_courts': content['n_courts'],
+        'player_names': content['players'],
+        'n_players': content.get('n_players', len(content['players'])),
+        'iterations': 25000
+    }
+    return jsonify(create_optimal(**params))

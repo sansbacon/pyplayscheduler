@@ -4,6 +4,15 @@ import json
 import itertools
 from typing import Any, Dict, List, Tuple
 
+from pyscheduler import Scheduler
+
+
+def create_optimal(**kwargs):
+    """Creates optimal schedule given parameters"""
+    s = Scheduler(**kwargs)
+    sched = s.optimize_schedule()
+    return sched.to_dict()
+
 
 def get_timestamp() -> datetime.datetime:
     today = datetime.datetime.now()
@@ -24,6 +33,8 @@ def readable_schedule(players: list, sched: str, sep=' - ') -> List[List]:
     items = []
     if isinstance(sched, str):
         sched = json.loads(sched)
+    if isinstance(sched, dict):
+        sched = sched.get('schedule')
     if isinstance(sched, list):
         for idx, rnd in enumerate(sched):
             court = 1
@@ -33,7 +44,7 @@ def readable_schedule(players: list, sched: str, sep=' - ') -> List[List]:
                 items.append([idx + 1, court, team1, team2])
                 court += 1
         return items
-    raise ValueError('Invalid schedule format')
+    raise ValueError(f'Invalid schedule format: {type(sched)}')
 
 
 def schedule_summary(players: List[str], sched: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
