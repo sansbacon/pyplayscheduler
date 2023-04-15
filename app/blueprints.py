@@ -1,4 +1,5 @@
-
+from collections import defaultdict
+import json
 import re
 
 from flask import Blueprint, current_app, jsonify, redirect, render_template, request, session, url_for
@@ -23,7 +24,6 @@ def index():
         if n_rounds := session['form_data'].get('n_rounds'):
             form.rounds.data = n_rounds
     if form.validate_on_submit():
-        mc.add('ts', ts())
         session['form_data'] = {
             'players': [str(i).strip() for i in re.split(r'[\n\r]+', form.players.data) if re.search(r'\w+', i)], 
             'rounds': form.rounds.data, 
@@ -31,6 +31,23 @@ def index():
         }
         return redirect(url_for('blueprint.schedule'))
     return render_template('index.html', form=form)
+
+
+@blueprint.route('/newschedule', methods=('POST',))
+def newschedule():
+    """Generates new schedule if optimal not already found"""
+    content = request.json
+    params = {
+        'n_rounds': content['n_rounds'],
+        'n_courts': content['n_courts'],
+        'player_names': content['players'],
+        'n_players': content.get('n_players', len(content['players'])),
+        'iterations': 25000
+    }
+    schedule = create_optimal(**params)
+    schedule_key = f"schedule_{params['n_courts']}_{params['n_rounds']}_{params['n_players']}"
+    mc.add(schedule_key, json.dumps(schedule['schedule'].tolist()))
+    return jsonify(schedule)
 
 
 @blueprint.route('/schedule', methods=('GET',))
@@ -46,38 +63,31 @@ def schedule():
               'n_players': len(f['players']),
               'iterations': 25000
             }
-            rs = readable_schedule(f['players'], create_optimal(**params))
+            sched = create_optimal(**params)
+            rs = readable_schedule(f['players'], sched)
     else:
         rs = [[1, 1, 'No available schedule', 'Please try again']]
+    schedule_key = f"schedule_{f['courts']}_{f['rounds']}_{len(f['players'])}"
+    mc.add(schedule_key, json.dumps(sched))
+    mc.add('rs', json.dumps(rs))
     data = {**f, **{'schedule': rs}}
     return render_template('schedule.html', data=data)
 
 
 @blueprint.route('/summary', methods=('GET',))
 def summary():
-    try:
-        f = session['form_data']
-        players = f['players']
+    """Summarizes schedule by player, partner_dupcounts, opp_dupcounts"""
+    data = defaultdict(list)
+    f = session['form_data']
+    players = f['players']
+    schedule_key = f"schedule_{f['courts']}_{f['rounds']}_{len(players)}"
+    if schedule := mc.get(schedule_key):
+        schedule = json.loads(schedule)
+    else:
         schedule = f.get('schedule', current_app.schedule.get((int(f['courts']), int(f['rounds']), len(players))))
-        partners, opponents = schedule_summary(players, schedule)
-        data = {'summary': []}
-
-        for (k, v), (k2, v2) in zip(partners.items(), opponents.items()):
-            data['summary'].append([k, v, v2])       
-    except:
-        data = {'summary': [[1, 'No available schedule', 'Please try again']]}
+    if not schedule:
+        raise ValueError(f'Cannot find schedule for {schedule_key}')
+    partners, opponents = schedule_summary(players, schedule)
+    for (k, v), (k2, v2) in zip(partners.items(), opponents.items()):
+        data['summary'].append([k, v, v2])       
     return render_template('summary.html', data=data)
-
-
-@blueprint.route('/newschedule', methods=('POST',))
-def newschedule():
-    """Generates new schedule if optimal not already found"""
-    content = request.json
-    params = {
-        'n_rounds': content['n_rounds'],
-        'n_courts': content['n_courts'],
-        'player_names': content['players'],
-        'n_players': content.get('n_players', len(content['players'])),
-        'iterations': 25000
-    }
-    return jsonify(create_optimal(**params))

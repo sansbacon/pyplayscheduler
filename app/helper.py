@@ -45,7 +45,7 @@ def readable_schedule(players: list, sched: str, sep=' - ') -> List[List]:
     return items
 
 
-def schedule_summary(players: List[str], sched: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+def schedule_summary(players: List[str], sched: Any) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Summarizes schedule by player
     
     Keys:
@@ -63,8 +63,11 @@ def schedule_summary(players: List[str], sched: str) -> Tuple[Dict[str, Any], Di
     # then can count at the end
     # ultimately want to implement this as part of schedule optimizer
     # this is a simple fix for the time being
-    sched = json.loads(sched)
-
+    if isinstance(sched, str):
+        sched = json.loads(sched)
+    if isinstance(sched, np.ndarray):
+        sched = sched.tolist()
+        
     partners = defaultdict(int)
     opponents = defaultdict(int)
 
