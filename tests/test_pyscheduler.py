@@ -5,7 +5,7 @@ import random
 import numpy as np
 import pytest
 
-from pyscheduler import Scheduler
+from pyscheduler import Scheduler, Schedule
 
 
 @pytest.fixture
@@ -13,6 +13,27 @@ def s() -> Scheduler:
     params = {'n_players': 13, 'n_rounds': 5, 'n_courts': 3, 'iterations': 50}
     return Scheduler(**params)
     
+
+def test_schedule(s: Scheduler):
+    sched = s.optimize_schedule()
+    assert isinstance(sched, Schedule)
+    
+
+def test_schedule_serialize_numpy(s: Scheduler):
+    sched = s.optimize_schedule()
+    d = sched.to_dict(convert_numpy=False)
+    assert isinstance(d.get('schedule'), np.ndarray)
+    assert isinstance(d.get('partner_dupcount'), np.int64)
+    assert isinstance(d.get('opponent_dupcount'), np.int64)
+    
+
+def test_schedule_serialize(s: Scheduler):
+    sched = s.optimize_schedule()
+    d = sched.to_dict()
+    assert isinstance(d.get('schedule'), list)
+    assert isinstance(d.get('partner_dupcount'), int)
+    assert isinstance(d.get('opponent_dupcount'), int)
+
 
 def test_scheduler_valid(player_names):
     """Tests constructor"""

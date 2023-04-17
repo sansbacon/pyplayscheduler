@@ -4,3 +4,8 @@ flask-bootstrap
 flask-wtf
 wtforms
 flask-nav
+pyplayscheduler
+numpy
+pandas
+appengine-python-standard>=1.0.0
+google-cloud-logging

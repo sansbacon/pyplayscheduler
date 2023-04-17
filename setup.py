@@ -15,7 +15,7 @@ long_description = (Path(__file__).parent / 'README.md').read_text()
 def run():
    setup(
       name='pyplayscheduler',
-      version='0.1',
+      version='0.1.1',
       description='python library and webapp for scheduling pickleball games',
       long_description=long_description,
       long_description_content_type='text/markdown',

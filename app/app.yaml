@@ -13,4 +13,10 @@
 # limitations under the License.
 
 runtime: python39
+
+app_engine_apis: true
+
 entrypoint: gunicorn -b :$PORT main:app
+
+env_variables:
+    MEMCACHE_USE_CROSS_COMPATIBLE_PROTOCOL: 'True'

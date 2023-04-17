@@ -39,14 +39,20 @@ class Schedule:
     def player_count(self):
         return np.unique(self.schedule.flatten()).shape[0]
 
-    def to_dict(self):
+    def to_dict(self, convert_numpy=True):
         """Converts object to three-keyed dict: schedule, partner_dupcount, opponent_dupcount"""
+        if not convert_numpy:
+            return {
+                'schedule': self.schedule,
+                'partner_dupcount': self.partner_dupcount,
+                'opponent_dupcount': self.opponent_dupcount            
+            }
         return {
-            'schedule': self.schedule,
-            'partner_dupcount': self.partner_dupcount,
-            'opponent_dupcount': self.opponent_dupcount            
+            'schedule': self.schedule.tolist(),
+            'partner_dupcount': int(self.partner_dupcount),
+            'opponent_dupcount': int(self.opponent_dupcount)            
         }
-
+    
 
 class Scheduler:
     """"Class for generating optimal round-robin / open play schedule
@@ -84,12 +90,11 @@ class Scheduler:
             if type(player_names) not in [list, np.ndarray]:
                 raise ValueError(f'Invalid value (must be list or array) for player_names: {player_names}')
             self.player_names = player_names if isinstance(player_names, np.ndarray) else np.array(player_names)
-            self._n_players = self.player_names.shape[0]
         elif n_players is not None:
-            self.player_names = []
-            self._n_players = n_players
+            self.player_names = np.array([str(i) for i in np.arange(n_players)])
         else:
             raise ValueError('Must specify player names or number of players')
+        self._n_players = self.player_names.shape[0]
         self.n_courts = n_courts
         self.n_rounds = n_rounds
         self.players_per_court = players_per_court
@@ -131,7 +136,7 @@ class Scheduler:
         # create 2d aray byeschedule (iterations * n_rounds, n_courts * players_per_court)
         # then shuffle each row inplace using shuffle_along
         # after shuffle, can reshape to 3d array (iterations, n_rounds, n_courts * players_per_court)
-        sched = np.tile(np.arange(n_players), n_rounds).reshape(n_rounds, n_players)
+        sched = np.tile(np.arange(n_players, dtype=np.uint8), n_rounds).reshape(n_rounds, n_players)
         byes = self.calculate_byes(n_players, n_courts, n_rounds, players_per_court)
         byesched = np.tile(np.array([np.setdiff1d(sched[i], byes[i]) for i in range(n_rounds)]), (iterations, 1, 1)).reshape(iterations * n_rounds, players_per_court * n_courts)
         self.shuffle_along(byesched)
@@ -165,7 +170,7 @@ class Scheduler:
         # so create large list of byes and cut it down accordingly
         byes_per_round = n_players % 4 if n_players < (n_courts + 1) * players_per_court else n_players - (n_courts * players_per_court)
         byes_needed = byes_per_round * n_rounds
-        return np.tile(np.arange(n_players), 5)[0:byes_needed].reshape(n_rounds, byes_per_round)
+        return np.tile(np.arange(n_players, dtype=np.uint8), 5)[0:byes_needed].reshape(n_rounds, byes_per_round)
 
     def cartesian(self, arrays: np.ndarray, out=None) -> np.ndarray:
         """Generate a cartesian product of input arrays.
@@ -232,7 +237,7 @@ class Scheduler:
         # shape should be 5, 60, 2
         partners = sched.reshape(sched.shape[0] * sched.shape[1] // 2, 2)
         sortidx = np.argsort(partners, axis=1)
-        dupcount = partners.shape[0] - np.unique(partners[np.arange(partners.shape[0])[:,None], sortidx], axis=0).shape[0]
+        dupcount = partners.shape[0] - np.unique(partners[np.arange(partners.shape[0], dtype=np.uint8)[:,None], sortidx], axis=0).shape[0]
         if return_data:
             return dupcount, partners
         return dupcount
@@ -350,6 +355,7 @@ class Scheduler:
         # get initial schedule - setdiff1d will remove shuffle so do shuffle later
         # sched is shape (n_rounds, n_players)
         scheds = self.create_schedules(n_players, n_rounds, n_courts, iterations, players_per_court)
+        print(scheds.dtype)
 
         # for naive scoring function, we first minimize the count of duplicates
         # from the 1+ schedules with the same duplicate count, we then minimize opponent duplicates
