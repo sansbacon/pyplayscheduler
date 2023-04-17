@@ -2,10 +2,11 @@ from collections import defaultdict
 import json
 import logging
 import re
+import sys
 
 from flask import Blueprint, current_app, jsonify, redirect, render_template, request, session, url_for
 from google.appengine.api.memcache import Client
-#import google.cloud.logging as gcl
+import google.cloud.logging as gcl
 
 from forms import SettingsForm
 from helper import create_optimal, readable_schedule, schedule_key, schedule_summary
@@ -13,8 +14,14 @@ from helper import create_optimal, readable_schedule, schedule_key, schedule_sum
 
 blueprint = Blueprint('blueprint', __name__, static_folder='static', template_folder='templates')
 mc = Client()
-#client = gcl.Client()
-#client.setup_logging()
+
+root = logging.getLogger()
+root.setLevel(logging.INFO)
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+root.addHandler(handler)
 
 
 @blueprint.route('/', methods=('GET', 'POST'))
@@ -91,7 +98,7 @@ def summary():
     logging.info(f"Schedule key is {key}")
 
     if schedule := mc.get(key):
-        logging.info(f"Found schedule in memcache")
+        logging.info("Found schedule in memcache")
         schedule = json.loads(schedule)
     else:
         logging.info('Got schedule from app')

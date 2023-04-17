@@ -6,7 +6,7 @@ from flask_wtf import FlaskForm
 from wtforms import TimeField, TextAreaField, SubmitField, SelectField
 from wtforms.validators import DataRequired, ValidationError
 
-from helper import get_timestamp, number_to_word
+from helper import number_to_word
 
 
 class SettingsForm(FlaskForm):

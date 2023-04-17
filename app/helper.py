@@ -35,7 +35,6 @@ def readable_schedule(players: list, sched: str, sep=' - ') -> List[List]:
         return [[1, 1, 'No available schedule', 'No available schedule']]
     if isinstance(sched, str):
         sched = json.loads(sched)
-        print('Converted sched from string to list')
     items = []
     for idx, rnd in enumerate(sched):
         for court, matchup in enumerate(rnd):
