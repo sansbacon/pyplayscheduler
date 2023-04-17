@@ -1,16 +1,20 @@
 from collections import defaultdict
 import json
+import logging
 import re
 
 from flask import Blueprint, current_app, jsonify, redirect, render_template, request, session, url_for
 from google.appengine.api.memcache import Client
+#import google.cloud.logging as gcl
 
 from forms import SettingsForm
-from helper import create_optimal, readable_schedule, schedule_summary, ts
+from helper import create_optimal, readable_schedule, schedule_key, schedule_summary
 
 
 blueprint = Blueprint('blueprint', __name__, static_folder='static', template_folder='templates')
 mc = Client()
+#client = gcl.Client()
+#client.setup_logging()
 
 
 @blueprint.route('/', methods=('GET', 'POST'))
@@ -45,8 +49,10 @@ def newschedule():
         'iterations': 25000
     }
     schedule = create_optimal(**params)
-    schedule_key = f"schedule_{params['n_courts']}_{params['n_rounds']}_{params['n_players']}"
-    mc.add(schedule_key, json.dumps(schedule['schedule'].tolist()))
+    key = schedule_key(params['n_courts'], params['n_rounds'], params['n_players'])
+    logging.info(f"Schedule key is {key}")
+    logging.info(f"Schedule is {json.dumps(schedule['schedule'].tolist())}")
+    mc.add(key, schedule['schedule'])
     return jsonify(schedule)
 
 
@@ -67,8 +73,10 @@ def schedule():
             rs = readable_schedule(f['players'], sched)
     else:
         rs = [[1, 1, 'No available schedule', 'Please try again']]
-    schedule_key = f"schedule_{f['courts']}_{f['rounds']}_{len(f['players'])}"
-    mc.add(schedule_key, json.dumps(sched))
+    key = schedule_key(f['courts'], f['rounds'], len(f['players']))
+    logging.info(f"Schedule key is {key}")
+    logging.info(f"Readable schedule is {json.dumps(rs)}")
+    mc.add(key, json.dumps(sched))
     mc.add('rs', json.dumps(rs))
     data = {**f, **{'schedule': rs}}
     return render_template('schedule.html', data=data)
@@ -79,15 +87,21 @@ def summary():
     """Summarizes schedule by player, partner_dupcounts, opp_dupcounts"""
     data = defaultdict(list)
     f = session['form_data']
-    players = f['players']
-    schedule_key = f"schedule_{f['courts']}_{f['rounds']}_{len(players)}"
-    if schedule := mc.get(schedule_key):
+    key = schedule_key(f['courts'], f['rounds'], len(f['players']))
+    logging.info(f"Schedule key is {key}")
+
+    if schedule := mc.get(key):
+        logging.info(f"Found schedule in memcache")
         schedule = json.loads(schedule)
     else:
-        schedule = f.get('schedule', current_app.schedule.get((int(f['courts']), int(f['rounds']), len(players))))
+        logging.info('Got schedule from app')
+        schedule = f.get('schedule', current_app.schedule.get((int(f['courts']), int(f['rounds']), len(f['players']))))
     if not schedule:
         raise ValueError(f'Cannot find schedule for {schedule_key}')
-    partners, opponents = schedule_summary(players, schedule)
+    logging.info(f'Schedule type is {str(type(schedule))}')
+    partners, opponents = schedule_summary(f['players'], schedule)
+    logging.info(json.dumps(partners))
+    logging.info(json.dumps(opponents))
     for (k, v), (k2, v2) in zip(partners.items(), opponents.items()):
         data['summary'].append([k, v, v2])       
     return render_template('summary.html', data=data)

@@ -45,6 +45,11 @@ def readable_schedule(players: list, sched: str, sep=' - ') -> List[List]:
     return items
 
 
+def schedule_key(*args):
+    """Creates a schedule key"""
+    return '_'.join(['schedule'] + [str(arg) for arg in args])
+
+
 def schedule_summary(players: List[str], sched: Any) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Summarizes schedule by player
     
