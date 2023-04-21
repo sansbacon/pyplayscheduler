@@ -9,3 +9,4 @@ numpy
 pandas
 appengine-python-standard>=1.0.0
 google-cloud-logging
+google-cloud-ndb

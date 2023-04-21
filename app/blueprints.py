@@ -2,26 +2,17 @@ from collections import defaultdict
 import json
 import logging
 import re
-import sys
 
 from flask import Blueprint, current_app, jsonify, redirect, render_template, request, session, url_for
-from google.appengine.api.memcache import Client
-import google.cloud.logging as gcl
+from google.cloud import ndb
 
+from app import mc
 from forms import SettingsForm
 from helper import create_optimal, readable_schedule, schedule_key, schedule_summary
+from model import OptimalSchedule
 
 
 blueprint = Blueprint('blueprint', __name__, static_folder='static', template_folder='templates')
-mc = Client()
-
-root = logging.getLogger()
-root.setLevel(logging.INFO)
-handler = logging.StreamHandler(sys.stdout)
-handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-root.addHandler(handler)
 
 
 @blueprint.route('/', methods=('GET', 'POST'))
@@ -42,6 +33,21 @@ def index():
         }
         return redirect(url_for('blueprint.schedule'))
     return render_template('index.html', form=form)
+
+
+@blueprint.route('/loadschedule', methods=('GET',))
+def loadschedule():
+    """Loads schedule into datastore"""
+    client = ndb.Client()
+    with client.context():
+        item = OptimalSchedule(
+            schedule_id="schedule_2_5_13",
+            n_courts=2,
+            n_rounds=5,
+            n_players=13,
+            schedule=[[1, 2, 3, 4], [4, 2, 3, 1]])
+        item.put()
+    return render_template('base.html')
 
 
 @blueprint.route('/newschedule', methods=('POST',))
