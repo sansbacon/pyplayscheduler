@@ -2,10 +2,13 @@ from collections import defaultdict
 import datetime
 import json
 import itertools
+import re
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
 from pyscheduler import Scheduler
+
+from model import OptimalSchedule
 
 
 def create_optimal(**kwargs) -> dict:
@@ -14,7 +17,12 @@ def create_optimal(**kwargs) -> dict:
     sched = s.optimize_schedule()
     d = sched.to_dict()
     sched = d.get('schedule')
-    return sched.tolist()
+    return OptimalSchedule(schedule=sched.tolist(), **kwargs)
+
+
+def create_schedule_key(*args):
+    """Creates a schedule key"""
+    return '_'.join(['schedule'] + [str(arg) for arg in args])
 
 
 def get_timestamp() -> datetime.datetime:
@@ -26,6 +34,11 @@ def number_to_word(n: Any) -> str:
         return {'1': "One", '2': "Two", '3': "Three", '4': "Four", '5': "Five", '6': "Six",
                 '7': "Seven", '8': "Eight", '9': "Nine", '10': "Ten", '11': "Eleven", '12': "Twelve",
                 '13': "Thirteen", '14': "Fourteen", '15': "Fifteen", '20': "Twenty", '25': "Twenty-Five", '30': 'Thirty'}.get(str(n))
+
+
+def parse_players(s, sep='\n'):
+    if sep == '\n':
+        return [str(i).strip() for i in re.split(r'[\n\r]+', s) if re.search(r'\w+', i)]
 
 
 def readable_schedule(players: list, sched: str, sep=' - ') -> List[List]:
@@ -42,11 +55,6 @@ def readable_schedule(players: list, sched: str, sep=' - ') -> List[List]:
             team2 = sep.join([players[int(i)].strip() for i in matchup[2:]])            
             items.append([idx + 1, court + 1, team1, team2])
     return items
-
-
-def schedule_key(*args):
-    """Creates a schedule key"""
-    return '_'.join(['schedule'] + [str(arg) for arg in args])
 
 
 def schedule_summary(players: List[str], sched: Any) -> Tuple[Dict[str, Any], Dict[str, Any]]:

@@ -31,9 +31,9 @@ app.config.from_object(config[os.getenv('FLASK_ENV', 'dev')])
 app.secret_key = 'xyzabc'
 app.wsgi_app = wrap_wsgi_app(app.wsgi_app)
 filename = os.path.join(app.static_folder, 'schedule.json')
-with open(filename) as test_file:
-    app.schedule = {f"schedule_{item['n_courts']}_{item['n_rounds']}_{item['n_players']}": item['schedule'] 
-                    for item in json.load(test_file)}
+with open(filename) as fh:
+    app.optimal_schedules = {f"schedule_{item['n_courts']}_{item['n_rounds']}_{item['n_players']}": item['schedule'] 
+                             for item in json.load(fh)}
 app.register_blueprint(blueprint)
 Bootstrap(app)
 nav.init_app(app)

@@ -1,15 +1,15 @@
 from collections import defaultdict
 import json
 import logging
-import re
+import uuid
 
 from flask import Blueprint, current_app, jsonify, redirect, render_template, request, session, url_for
 from google.cloud import ndb
 
-from app import mc
+from main import client, mc
 from forms import SettingsForm
-from helper import create_optimal, readable_schedule, schedule_key, schedule_summary
-from model import OptimalSchedule
+from helper import create_optimal, create_schedule_key, parse_players, readable_schedule, schedule_summary
+from model import CustomSchedule, OptimalSchedule
 
 
 blueprint = Blueprint('blueprint', __name__, static_folder='static', template_folder='templates')
@@ -22,77 +22,80 @@ def index():
         if players := session['form_data'].get('players'):
             form.players.data = '\n'.join(players)
         if n_courts := session['form_data'].get('n_courts'):
-            form.courts.data = n_courts
+            form.courts.data = int(n_courts)
         if n_rounds := session['form_data'].get('n_rounds'):
-            form.rounds.data = n_rounds
+            form.rounds.data = int(n_rounds)
+
     if form.validate_on_submit():
-        session['form_data'] = {
-            'players': [str(i).strip() for i in re.split(r'[\n\r]+', form.players.data) if re.search(r'\w+', i)], 
-            'rounds': form.rounds.data, 
-            'courts': form.courts.data
-        }
-        return redirect(url_for('blueprint.schedule'))
+        # the schedule generation logic needs to be here
+        # the schedule page can then be a lookup and display
+        data = session.get('form_data')
+        skey = create_schedule_key(data.get('n_courts'), data.get('n_rounds'), data.get('n_players'))
+
+        # look up the optimal schedule in the app
+        optimal = current_app.schedule.get(skey)
+
+        # if not in the app, see if it is in the cache
+        if not optimal:
+            optimal = mc.get(skey)
+
+        # if not in the cache, check the datastore
+        if not optimal:
+            optimal = OptimalSchedule.find_by_id(skey)
+            mc.put(skey, optimal)
+        
+        # if not in the datastore, generate new optimal
+        if not optimal:
+            optimal = create_optimal(data.get('n_courts'), data.get('n_rounds'), data.get('n_players'))
+            mc.put(skey, optimal)
+            
+            with client.context():
+                optimal.put()
+
+        custom_sched = CustomSchedule(
+            n_courts=form.courts.data,
+            n_rounds=form.rounds.data,
+            players=parse_players(form.players.data),
+            optimal_schedule=optimal
+        )
+
+        # put schedule in session, cache, and datastore
+        session[custom_sched.custom_schedule_id] = custom_sched.to_json()
+        mc.put(custom_sched.custom_schedule_id, custom_sched)
+        with client.context():
+            custom_sched.put()
+
+        return redirect(url_for('blueprint.schedule', id=custom_sched.custom_schedule_id))
     return render_template('index.html', form=form)
 
 
-@blueprint.route('/loadschedule', methods=('GET',))
-def loadschedule():
-    """Loads schedule into datastore"""
-    client = ndb.Client()
-    with client.context():
-        item = OptimalSchedule(
-            schedule_id="schedule_2_5_13",
-            n_courts=2,
-            n_rounds=5,
-            n_players=13,
-            schedule=[[1, 2, 3, 4], [4, 2, 3, 1]])
-        item.put()
-    return render_template('base.html')
+    @blueprint.route('/schedule', methods=('GET', 'POST'))
+    def schedule():
+        # if no schedule id, then redirect to schedule form
+        schedule_id = request.args.get('id')
+        if not schedule_id:
+            redirect(url_for('blueprint.index'))
 
+        # find the schedule
+        # try the session first
+        try:
+            schedule = CustomSchedule.from_json(session.get(schedule_id))
+        except:
+            schedule = None
+            
+        # try the cache
+        if not schedule:
+            schedule = mc.get(schedule_id)
 
-@blueprint.route('/newschedule', methods=('POST',))
-def newschedule():
-    """Generates new schedule if optimal not already found"""
-    content = request.json
-    params = {
-        'n_rounds': content['n_rounds'],
-        'n_courts': content['n_courts'],
-        'player_names': content['players'],
-        'n_players': content.get('n_players', len(content['players'])),
-        'iterations': 25000
-    }
-    schedule = create_optimal(**params)
-    key = schedule_key(params['n_courts'], params['n_rounds'], params['n_players'])
-    logging.info(f"Schedule key is {key}")
-    logging.info(f"Schedule is {json.dumps(schedule['schedule'].tolist())}")
-    mc.add(key, schedule['schedule'])
-    return jsonify(schedule)
+        # try the datastore
+        if not schedule:
+            with client.context():
+                schedule = CustomSchedule.find_by_id(schedule_id)
+                mc.put(schedule_id, schedule)
 
-
-@blueprint.route('/schedule', methods=('GET',))
-def schedule():
-    if f := session['form_data']:
-        sched = current_app.schedule.get((int(f['courts']), int(f['rounds']), len(f['players'])))
-        if sched:
-            rs = readable_schedule(f['players'], sched)
-        else:
-            params = {
-              'n_rounds': int(f['rounds']),
-              'n_courts': int(f['courts']), 
-              'n_players': len(f['players']),
-              'iterations': 25000
-            }
-            sched = create_optimal(**params)
-            rs = readable_schedule(f['players'], sched)
-    else:
-        rs = [[1, 1, 'No available schedule', 'Please try again']]
-    key = schedule_key(f['courts'], f['rounds'], len(f['players']))
-    logging.info(f"Schedule key is {key}")
-    logging.info(f"Readable schedule is {json.dumps(rs)}")
-    mc.add(key, json.dumps(sched))
-    mc.add('rs', json.dumps(rs))
-    data = {**f, **{'schedule': rs}}
-    return render_template('schedule.html', data=data)
+        # create the readable schedule        
+        _ = schedule.readable_schedule()
+        return render_template('schedule.html', data=schedule.to_dict())
 
 
 @blueprint.route('/summary', methods=('GET',))
@@ -100,17 +103,17 @@ def summary():
     """Summarizes schedule by player, partner_dupcounts, opp_dupcounts"""
     data = defaultdict(list)
     f = session['form_data']
-    key = schedule_key(f['courts'], f['rounds'], len(f['players']))
-    logging.info(f"Schedule key is {key}")
+    skey = create_schedule_key(f['courts'], f['rounds'], len(f['players']))
+    logging.info(f"Schedule key is {skey}")
 
-    if schedule := mc.get(key):
+    if schedule := mc.get(skey):
         logging.info("Found schedule in memcache")
         schedule = json.loads(schedule)
     else:
         logging.info('Got schedule from app')
         schedule = f.get('schedule', current_app.schedule.get((int(f['courts']), int(f['rounds']), len(f['players']))))
     if not schedule:
-        raise ValueError(f'Cannot find schedule for {schedule_key}')
+        raise ValueError(f'Cannot find schedule for {skey}')
     logging.info(f'Schedule type is {str(type(schedule))}')
     partners, opponents = schedule_summary(f['players'], schedule)
     logging.info(json.dumps(partners))
